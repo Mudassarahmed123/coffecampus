@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EUDR Coffee Compass</title>
+    
+    <!-- OpenLayers CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v7.4.0/ol.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- OpenLayers JS -->
+    <script src="https://cdn.jsdelivr.net/npm/ol@v7.4.0/dist/ol.js"></script>
+    
+    <!-- Config -->
+    <script src="config.js"></script>
+</head>
+<body>
+    <div class="content-wrapper">
+        <div id="logo">
+            <img src="images/logo.svg" alt="Logo">
+        </div>
+
+        <div id="map" class="map"></div>
+
+        <div id="map-type-toggle">
+            <button class="active">Map</button>
+            <button>Satellite</button>
+        </div>
+
+        <div id="layer-control" class="layer-control">
+            <button class="collapse-toggle" title="Toggle layers">←</button>
+            <h4>Layers</h4>
+            <div class="layer-items">
+                <div class="layer-item">
+                    <div class="layer-header">
+                        <div class="layer-title">
+                            <input type="checkbox" id="forest_presence_view" checked>
+                            <label for="forest_presence_view">Presence of Forest</label>
+                        </div>
+                    </div>
+                    <div id="forest_presence_view-legend" class="layer-legend"></div>
+                </div>
+
+                <div class="layer-item">
+                    <div class="layer-header">
+                        <div class="layer-title">
+                            <input type="checkbox" id="deforestation_view">
+                            <label for="deforestation_view">Prevalence of Deforestation</label>
+                        </div>
+                    </div>
+                    <div id="deforestation_view-legend" class="layer-legend"></div>
+                </div>
+
+                <div class="layer-item">
+                    <div class="layer-header">
+                        <div class="layer-title">
+                            <input type="checkbox" id="social_GHR">
+                            <label for="social_GHR">Governance and Human Rights</label>
+                        </div>
+                    </div>
+                    <div id="social_GHR-legend" class="layer-legend"></div>
+                </div>
+
+                <div class="layer-item">
+                    <div class="layer-header">
+                        <div class="layer-title">
+                            <input type="checkbox" id="coffee_regions_view">
+                            <label for="coffee_regions_view">Coffee Region</label>
+                        </div>
+                    </div>
+                    <div id="coffee_regions_view-legend" class="layer-legend"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="popup" class="ol-popup">
+            <a href="#" id="popup-closer" class="ol-popup-closer"></a>
+            <div id="popup-content"></div>
+        </div>
+
+        <div id="hover-info" class="hover-info"></div>
+
+        <div id="pagination-controls" style="display: none;">
+            <button id="prev-page">Previous</button>
+            <span id="page-info">Page 1</span>
+            <button id="next-page">Next</button>
+        </div>
+
+        <div id="legend" class="legend"></div>
+
+        <button id="info-toggle" class="info-toggle">
+            <span>ℹ️</span>
+        </button>
+
+        <div id="info-panel" class="info-panel">
+            <!-- Info Panel Content -->
+            <div id="info-default-content">
+                <div class="info-header">
+                    <h3>Information Panel</h3>
+                    <div class="header-controls">
+                        <div id="panel-toggle" class="panel-toggle">
+                            <span class="toggle-info active">Info</span>
+                            <span class="toggle-widget">Filter</span>
+                        </div>
+                        <button class="info-close">✖</button>
+                    </div>
+                </div>
+                <!-- Info content goes here -->
+            </div>
+
+            <!-- Filter Panel Content -->
+            <div id="filter-content" style="display: none;">
+                <div class="info-header">
+                    <h3>Filter Panel</h3>
+                    <div class="header-controls">
+                        <div id="panel-toggle" class="panel-toggle">
+                            <span class="toggle-info">Info</span>
+                            <span class="toggle-widget active">Filter</span>
+                        </div>
+                        <button class="info-close">✖</button>
+                    </div>
+                </div>
+                <div id="filter-widget">
+                    <div class="widget-sections">
+                        <!-- States Section -->
+                        <div class="widget-section">
+                            <div class="widget-header">
+                                <h4>States</h4>
+                                <div class="flex items-center gap-2">
+                                    <button id="clear-states" class="text-blue-500">Clear</button>
+                                    <button id="lock-states" class="text-blue-500 lock-button">Lock</button>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <input type="text" id="state-search" class="search-input" placeholder="Search states...">
+                            </div>
+                            <div class="selected-count">
+                                <span class="text-sm text-gray-500">Selected: <span id="selected-states-count">0</span></span>
+                            </div>
+                            <div id="states-list" class="checkbox-list"></div>
+                        </div>
+
+                        <!-- Municipalities Section -->
+                        <div class="widget-section">
+                            <div class="widget-header">
+                                <h4>Municipalities</h4>
+                                <button id="all-municipalities" class="text-blue-500">Select All</button>
+                            </div>
+                            <div class="mt-2">
+                                <input type="text" id="municipality-search" class="search-input" placeholder="Search municipalities...">
+                            </div>
+                            <div id="municipalities-list" class="checkbox-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom JS -->
+    <script src="map.js"></script>
+    <script src="info-panel.js"></script>
+
+    <!-- Initialize the map -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize default state
+            window.selectedStates = new Set();
+            window.selectedMunicipalities = new Set();
+            
+            // Only show forest presence layer by default
+            if (window.forestPresenceLayer) {
+                forestPresenceLayer.setVisible(true);
+                const forestCheckbox = document.getElementById('forest_presence_view');
+                if (forestCheckbox) forestCheckbox.checked = true;
+            }
+            if (window.deforestationLayer) {
+                deforestationLayer.setVisible(false);
+                const deforestationCheckbox = document.getElementById('deforestation_view');
+                if (deforestationCheckbox) deforestationCheckbox.checked = false;
+            }
+            if (window.socialGHRLayer) {
+                socialGHRLayer.setVisible(false);
+                const socialGHRCheckbox = document.getElementById('social_GHR');
+                if (socialGHRCheckbox) socialGHRCheckbox.checked = false;
+            }
+            if (window.coffeeRegionLayer) {
+                coffeeRegionLayer.setVisible(false);
+                const coffeeRegionCheckbox = document.getElementById('coffee_regions_view');
+                if (coffeeRegionCheckbox) coffeeRegionCheckbox.checked = false;
+            }
+            
+            // Center map on Kenya by default
+            if (window.map) {
+                window.map.getView().setCenter(ol.proj.fromLonLat([37.9062, 0.0236]));
+                window.map.getView().setZoom(6);
+            }
+            
+            // Initialize state handlers
+            if (typeof initializeStateHandlers === 'function') {
+                initializeStateHandlers();
+            }
+
+            // Call updateMapFilter to ensure proper initial state
+            if (typeof updateMapFilter === 'function') {
+                updateMapFilter();
+            }
+        });
+    </script>
+</body>
+</html>
