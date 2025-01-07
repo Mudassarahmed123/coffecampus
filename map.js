@@ -1,7 +1,8 @@
 // Layer styles
 const styles = {
     forest_presence_view: function(feature) {
-        const forRPerc = feature.get('for_r_perc') || feature.get('FOR_R_PERC');
+        const forRPerc = feature.get('for_r_perc') || feature.get('FOR_R_PERC') || feature.get('for_r_perc');
+        console.log('Forest presence value:', forRPerc);
         let color;
         
         if (forRPerc === '0%') {
@@ -20,7 +21,7 @@ const styles = {
         });
     },
     deforestation_view: function(feature) {
-        const defRPerc = feature.get('def_r_perc') || feature.get('DEF_R_PERC');
+        const defRPerc = feature.get('def_r_perc') || feature.get('DEF_R_PERC') || feature.get('def_r_perc');
         console.log('Deforestation value:', defRPerc);
         let color;
         
@@ -38,7 +39,7 @@ const styles = {
         });
     },
     coffee_regions_view: function(feature) {
-        const coffeeReg = feature.get('coffee_reg') || feature.get('COFFEE_REG');
+        const coffeeReg = feature.get('coffee_reg') || feature.get('COFFEE_REG') || feature.get('coffee_region');
         console.log('Coffee region value:', coffeeReg);
         const color = coffeeReg === "Yes" ? 'rgba(139, 69, 19, 0.6)' : 'rgba(210, 180, 140, 0.6)';
         
@@ -48,7 +49,7 @@ const styles = {
         });
     },
     social_GHR: function(feature) {
-        const value = feature.get('Ccrit_1_sc') || feature.get('CCRIT_1_SC');
+        const value = feature.get('Ccrit_1_sc') || feature.get('CCRIT_1_SC') || feature.get('ccrit_1_sc');
         console.log('Social GHR value:', value);
         const color = value ? 'rgba(100, 0, 255, 0.3)' : 'rgba(100, 200, 200, 0.3)';
         
@@ -94,6 +95,19 @@ function buildCQLFilter(layerName) {
     if (layerName === 'social_GHR') return '';
     
     let cqlFilter = `country='${config.getCurrentCountry()}'`;
+    
+    // Add state filter if states are selected
+    if (window.selectedStates && window.selectedStates.size > 0) {
+        const statesList = Array.from(window.selectedStates).map(state => `'${state}'`).join(',');
+        cqlFilter += ` AND "StateName" IN (${statesList})`;
+    }
+    
+    // Add municipality filter if municipalities are selected
+    if (window.selectedMunicipalities && window.selectedMunicipalities.size > 0) {
+        const muniList = Array.from(window.selectedMunicipalities).map(muni => `'${muni}'`).join(',');
+        cqlFilter += ` AND "Muni_Name" IN (${muniList})`;
+    }
+    
     return cqlFilter;
 }
 
@@ -101,33 +115,40 @@ function buildCQLFilter(layerName) {
 function createVectorTileLayer(layerName) {
     console.log(`Creating vector tile layer: ${layerName}`);
     
-    const viewparams = encodeURIComponent(`country:${config.getCurrentCountry()}`);
-    const cqlFilter = buildCQLFilter(layerName);
-    const filterParam = cqlFilter ? `&CQL_FILTER=${encodeURIComponent(cqlFilter)}` : '';
-    const baseUrl = `${config.GEOSERVER_BASE_URL}/geoserver/gwc/service/tms/1.0.0/it.geosolutions:${layerName}@EPSG%3A900913@pbf/{z}/{x}/{-y}.pbf?viewparams=${viewparams}${filterParam}`;
+    const currentCountry = config.getCurrentCountry();
+    console.log(`Current country: ${currentCountry}`);
+    
+    // Create source with country filter in URL and optimized settings
+    const source = new ol.source.VectorTile({
+        format: new ol.format.MVT(),
+        url: `${config.GEOSERVER_BASE_URL}/geoserver/gwc/service/tms/1.0.0/it.geosolutions:${layerName}@EPSG%3A900913@pbf/{z}/{x}/{-y}.pbf?viewparams=country:${currentCountry}`,
+        tileGrid: ol.tilegrid.createXYZ({
+            maxZoom: 19,
+            tileSize: 512, // Increased tile size for better performance
+            extent: ol.proj.get('EPSG:3857').getExtent()
+        }),
+        cacheSize: 256, // Increased cache size
+        preload: 2, // Preload nearby tiles
+        overlaps: false // Disable overlaps for better performance
+    });
     
     const layer = new ol.layer.VectorTile({
-        source: new ol.source.VectorTile({
-            format: new ol.format.MVT(),
-            url: baseUrl,
-            tileGrid: ol.tilegrid.createXYZ({ maxZoom: 19 })
-        }),
+        source: source,
         visible: true,
         style: function(feature) {
-            if (!feature) return null;
-            
-            if (layerName !== 'social_GHR') {
-                const featureCountry = feature.get('country') || feature.get('Country');
-                if (featureCountry !== config.getCurrentCountry()) {
-                    return null;
-                }
+            if (!feature || feature.get('country') !== currentCountry) {
+                return null;
             }
-            
             return styles[layerName](feature);
         },
         renderMode: 'vector',
         declutter: true,
-        renderBuffer: 100
+        renderBuffer: 128,
+        updateWhileAnimating: false,
+        updateWhileInteracting: false,
+        preload: 2,
+        minZoom: 5, // Add zoom constraints
+        maxZoom: 19
     });
 
     return layer;
@@ -173,6 +194,8 @@ function initializeLayerControl() {
                 } else {
                     legend.classList.remove('visible');
                 }
+                // Update the source when visibility changes
+                updateMapFilter();
             }
         });
     });
@@ -184,21 +207,39 @@ const deforestationLayer = createVectorTileLayer('deforestation_view');
 const socialGHRLayer = createVectorTileLayer('social_GHR');
 const coffeeRegionLayer = createVectorTileLayer('coffee_regions_view');
 
-// Base layers
+// Base layers with optimized settings
 const osmLayer = new ol.layer.Tile({
-    source: new ol.source.OSM(),
-    visible: true
+    source: new ol.source.OSM({
+        crossOrigin: 'anonymous',
+        wrapX: true,
+        tileLoadFunction: function(imageTile, src) {
+            imageTile.getImage().src = src;
+        },
+        cacheSize: 512,
+        preload: 2
+    }),
+    visible: true,
+    preload: 2,
+    minZoom: 1,
+    maxZoom: 21
 });
 
 const satelliteLayer = new ol.layer.Tile({
     source: new ol.source.XYZ({
         url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        maxZoom: 19
+        maxZoom: 21,
+        crossOrigin: 'anonymous',
+        wrapX: true,
+        cacheSize: 512,
+        preload: 2
     }),
-    visible: false
+    visible: false,
+    preload: 2,
+    minZoom: 1,
+    maxZoom: 21
 });
 
-// Create map
+// Create map with optimized settings
 const map = new ol.Map({
     target: 'map',
     layers: [
@@ -210,10 +251,17 @@ const map = new ol.Map({
         coffeeRegionLayer
     ],
     view: new ol.View({
-        center: ol.proj.fromLonLat([37.9062, 0.0236]), // Kenya coordinates
+        center: ol.proj.fromLonLat([37.9062, 0.0236]),
         zoom: 6,
-        projection: 'EPSG:3857'
-    })
+        projection: 'EPSG:3857',
+        maxZoom: 21,
+        minZoom: 1,
+        enableRotation: false,
+        zoomDuration: 500, // Slower zoom animation
+        constrainResolution: true
+    }),
+    loadTilesWhileAnimating: true,
+    loadTilesWhileInteracting: true
 });
 
 // Initialize popups
@@ -357,7 +405,7 @@ map.on('postrender', function(event) {
 });
 
 // Update map filter
-function updateMapFilter() {
+async function updateMapFilter() {
     const layers = {
         'forest_presence_view': forestPresenceLayer,
         'deforestation_view': deforestationLayer,
@@ -365,28 +413,90 @@ function updateMapFilter() {
         'social_GHR': socialGHRLayer
     };
     
-    Object.entries(layers).forEach(([layerName, layer]) => {
-        if (!layer || !layer.getSource) return;
+    const currentCountry = config.getCurrentCountry();
+    console.log(`Updating map filter for country: ${currentCountry}`);
+    console.log('Selected states:', Array.from(window.selectedStates || []));
+    console.log('Selected municipalities:', Array.from(window.selectedMunicipalities || []));
+    
+    // Get selected states and municipalities
+    const states = Array.from(window.selectedStates || []);
+    const municipalities = Array.from(window.selectedMunicipalities || []);
+    
+    // Update each layer
+    for (const [layerName, layer] of Object.entries(layers)) {
+        if (!layer || !layer.getSource) {
+            console.log(`Skipping layer ${layerName} - invalid layer object`);
+            continue;
+        }
         
         const checkbox = document.getElementById(layerName);
-        if (!checkbox) return;
+        if (!checkbox) {
+            console.log(`Skipping layer ${layerName} - checkbox not found`);
+            continue;
+        }
 
+        // Only update visibility based on checkbox state
         const isVisible = checkbox.checked;
+        console.log(`Setting ${layerName} visibility to ${isVisible}`);
         layer.setVisible(isVisible);
         
         if (isVisible) {
-            const source = layer.getSource();
-            const viewparams = encodeURIComponent(`country:${config.getCurrentCountry()}`);
-            const cqlFilter = buildCQLFilter(layerName);
-            const filterParam = cqlFilter ? `&CQL_FILTER=${encodeURIComponent(cqlFilter)}` : '';
+            // Special handling for social_GHR layer - only filter by country
+            if (layerName === 'social_GHR') {
+                layer.setStyle(function(feature) {
+                    if (!feature) return null;
+                    
+                    const featureCountry = feature.get('country') || feature.get('Country');
+                    const matchesCountry = featureCountry === currentCountry;
+                    
+                    if (matchesCountry) {
+                        return styles[layerName](feature);
+                    }
+                    return null;
+                });
+            } else {
+                // Update layer style to filter features for other layers
+                layer.setStyle(function(feature) {
+                    if (!feature) return null;
+                    
+                    const featureCountry = feature.get('country') || feature.get('Country');
+                    const featureState = feature.get('StateName') || feature.get('state_name');
+                    const featureMuni = feature.get('Muni_Name') || feature.get('muni_name');
+                    
+                    console.log(`Feature data for ${layerName}:`, {
+                        country: featureCountry,
+                        state: featureState,
+                        municipality: featureMuni
+                    });
+                    
+                    // Check if feature should be visible based on filters
+                    const matchesCountry = featureCountry === currentCountry;
+                    const matchesState = states.length === 0 || states.includes(featureState);
+                    const matchesMuni = municipalities.length === 0 || municipalities.includes(featureMuni);
+                    
+                    const isVisible = matchesCountry && matchesState && matchesMuni;
+                    console.log(`Feature visibility for ${layerName}:`, { isVisible, matchesCountry, matchesState, matchesMuni });
+                    
+                    if (isVisible) {
+                        return styles[layerName](feature);
+                    }
+                    return null;
+                });
+            }
             
-            const baseUrl = `${config.GEOSERVER_BASE_URL}/geoserver/gwc/service/tms/1.0.0/it.geosolutions:${layerName}@EPSG%3A900913@pbf/{z}/{x}/{-y}.pbf?viewparams=${viewparams}${filterParam}`;
-            source.setUrl(baseUrl);
+            // Force redraw
+            layer.getSource().changed();
+            layer.changed();
         }
-    });
-
-    // Update map view for the current country
+    }
+    
+    // Update map view
     updateMapView();
+    
+    // Force map render
+    if (window.map) {
+        window.map.render();
+    }
 }
 
 function updateMapView() {
@@ -428,6 +538,37 @@ function initializeMap() {
     map.getView().setCenter(ol.proj.fromLonLat(center));
     map.getView().setZoom(6);
 }
+
+// Add layer loading indicator
+let loadingLayerCount = 0;
+const loadingIndicator = document.createElement('div');
+loadingIndicator.className = 'loading-indicator';
+loadingIndicator.style.display = 'none';
+document.body.appendChild(loadingIndicator);
+
+function updateLoadingIndicator() {
+    loadingIndicator.style.display = loadingLayerCount > 0 ? 'block' : 'none';
+}
+
+// Track tile loading
+function trackTileLoad(layer) {
+    const source = layer.getSource();
+    source.on('tileloadstart', function() {
+        loadingLayerCount++;
+        updateLoadingIndicator();
+    });
+    source.on('tileloadend', function() {
+        loadingLayerCount--;
+        updateLoadingIndicator();
+    });
+    source.on('tileloaderror', function() {
+        loadingLayerCount--;
+        updateLoadingIndicator();
+    });
+}
+
+// Track loading for all layers
+[osmLayer, satelliteLayer, forestPresenceLayer, deforestationLayer, socialGHRLayer, coffeeRegionLayer].forEach(trackTileLoad);
 
 // Initialize everything when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {

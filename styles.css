@@ -614,3 +614,44 @@ body {
 .error-state p {
     margin: 5px 0;
 }
+
+/* Loading indicator styles */
+.loading-indicator {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 15px 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    display: none;
+}
+
+.loading-indicator::after {
+    content: 'Loading...';
+    display: block;
+    text-align: center;
+    font-size: 14px;
+    color: #333;
+    animation: loading-dots 1.5s infinite;
+}
+
+@keyframes loading-dots {
+    0% { content: 'Loading.'; }
+    33% { content: 'Loading..'; }
+    66% { content: 'Loading...'; }
+}
+
+/* Optimize layer transitions */
+.ol-layer {
+    transition: opacity 0.3s ease;
+    will-change: transform;
+}
+
+/* Optimize tile loading */
+.ol-tile {
+    will-change: transform;
+    backface-visibility: hidden;
+}

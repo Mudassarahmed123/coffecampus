@@ -100,34 +100,47 @@ def get_layers():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/layer_data/<layer_name>', methods=['GET'])
+@app.route('/api/layer_data/<layer_name>', methods=['GET', 'OPTIONS'])
 def get_layer_data(layer_name):
     try:
+        if request.method == 'OPTIONS':
+            return '', 204
+            
         country = request.args.get('country', 'Kenya')
-        selected_states = request.args.getlist('states[]')
-        selected_municipalities = request.args.getlist('municipalities[]')
+        states = request.args.getlist('states[]')
+        municipalities = request.args.getlist('municipalities[]')
 
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                query = f"""
+                base_query = f"""
                     SELECT *
                     FROM {layer_name}
                     WHERE country = %s
                 """
                 params = [country]
 
-                if selected_states:
-                    query += """ AND "StateName" = ANY(%s)"""
-                    params.append(selected_states)
+                # Only add filters if they are provided
+                if states:
+                    states_list = ','.join([f"'{state}'" for state in states])
+                    base_query += f""" AND "StateName" IN ({states_list})"""
                 
-                if selected_municipalities:
-                    query += """ AND "Muni_Name" = ANY(%s)"""
-                    params.append(selected_municipalities)
+                if municipalities:
+                    munis_list = ','.join([f"'{muni}'" for muni in municipalities])
+                    base_query += f""" AND "Muni_Name" IN ({munis_list})"""
 
-                cur.execute(query, params)
+                logger.debug(f"Executing query: {base_query} with params: {params}")
+                cur.execute(base_query, params)
                 data = cur.fetchall()
-                return jsonify(data)
+                
+                response = jsonify(data)
+                # Add CORS headers
+                response.headers.add('Access-Control-Allow-Origin', '*')
+                response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+                response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
+                return response
+                
     except Exception as e:
+        logger.error(f"Error in get_layer_data: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/regions', methods=['GET'])
