@@ -420,33 +420,57 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize event listeners for filter controls
     document.getElementById('clear-states')?.addEventListener('click', () => {
-        if (!isStatesLocked) {
-            window.selectedStates.clear();
-            window.selectedMunicipalities.clear();
+        window.selectedStates.clear();
+        window.selectedMunicipalities.clear();
+        updateStatesUI();
+        updateMunicipalitiesUI();
+        if (window.updateMapFilter) {
+            window.updateMapFilter();
+        }
+    });
+
+    // Change lock button to select all button
+    const lockButton = document.getElementById('lock-states');
+    if (lockButton) {
+        lockButton.textContent = 'Select All';
+        lockButton.addEventListener('click', function() {
+            // Get all available states
+            const allStates = states.map(state => state.statename);
+            
+            // If all states are already selected, clear the selection
+            if (window.selectedStates.size === allStates.length) {
+                window.selectedStates.clear();
+                window.selectedMunicipalities.clear();
+            } else {
+                // Otherwise, select all states
+                allStates.forEach(state => window.selectedStates.add(state));
+                // Also select all municipalities for these states
+                municipalities.forEach(muni => {
+                    if (window.selectedStates.has(muni.state_name)) {
+                        window.selectedMunicipalities.add(muni.muni_name);
+                    }
+                });
+            }
+            
             updateStatesUI();
             updateMunicipalitiesUI();
             if (window.updateMapFilter) {
                 window.updateMapFilter();
             }
-        }
-    });
-
-    document.getElementById('lock-states')?.addEventListener('click', function() {
-        isStatesLocked = !isStatesLocked;
-        this.classList.toggle('active');
-        updateStatesUI();
-    });
+        });
+    }
 
     document.getElementById('all-municipalities')?.addEventListener('click', () => {
-        const availableMunicipalities = [];
-        window.selectedStates.forEach(stateName => {
-            const stateMunis = stateToMunicipalitiesMap.get(stateName) || [];
-            stateMunis.forEach(muni => availableMunicipalities.push(muni.muni_name));
-        });
+        // Get all municipalities for selected states
+        const availableMunicipalities = municipalities.filter(muni => 
+            window.selectedStates.has(muni.state_name)
+        ).map(muni => muni.muni_name);
 
+        // If all available municipalities are selected, clear them
         if (window.selectedMunicipalities.size === availableMunicipalities.length) {
             window.selectedMunicipalities.clear();
         } else {
+            // Otherwise select all available municipalities
             availableMunicipalities.forEach(muni => window.selectedMunicipalities.add(muni));
         }
         
@@ -658,4 +682,165 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         </div>
     `;
+
+    // Initialize layer panel collapse functionality
+    const layerControl = document.getElementById('layer-control');
+    const toggleButton = document.querySelector('.collapse-toggle');
+    
+    if (toggleButton && layerControl) {
+        toggleButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            layerControl.classList.toggle('collapsed');
+            this.textContent = layerControl.classList.contains('collapsed') ? '→' : '←';
+        });
+    }
+
+    // Initialize empty selection sets
+    window.selectedStates = new Set();
+    window.selectedMunicipalities = new Set();
+
+    // Fetch initial data
+    fetchRegionsData();
+    
+    // Initialize layer control and other components
+    initializeLayerControl();
+    initializeMapTypeToggle();
+    initializePopup();
+    initializeHoverInfo();
+    initializeMap();
+    
+    // Make window.map available for other scripts
+    window.map = map;
+});
+
+// Initialize event listeners for filter controls
+function initializeFilterControls() {
+    // Clear states button
+    const clearStatesBtn = document.getElementById('clear-states');
+    if (clearStatesBtn) {
+        clearStatesBtn.addEventListener('click', function() {
+            window.selectedStates.clear();
+            window.selectedMunicipalities.clear();
+            updateStatesUI();
+            updateMunicipalitiesUI();
+            if (window.updateMapFilter) {
+                window.updateMapFilter();
+            }
+        });
+    }
+
+    // Select all states button (formerly lock button)
+    const selectAllStatesBtn = document.getElementById('lock-states');
+    if (selectAllStatesBtn) {
+        selectAllStatesBtn.textContent = 'Select All';
+        selectAllStatesBtn.addEventListener('click', function() {
+            const allStates = states.map(state => state.statename);
+            
+            if (window.selectedStates.size === allStates.length) {
+                // If all states are selected, clear everything
+                window.selectedStates.clear();
+                window.selectedMunicipalities.clear();
+            } else {
+                // Select all states and their municipalities
+                allStates.forEach(state => window.selectedStates.add(state));
+                municipalities.forEach(muni => {
+                    if (window.selectedStates.has(muni.state_name)) {
+                        window.selectedMunicipalities.add(muni.muni_name);
+                    }
+                });
+            }
+            
+            updateStatesUI();
+            updateMunicipalitiesUI();
+            if (window.updateMapFilter) {
+                window.updateMapFilter();
+            }
+        });
+    }
+
+    // Select all municipalities button
+    const selectAllMunisBtn = document.getElementById('all-municipalities');
+    if (selectAllMunisBtn) {
+        selectAllMunisBtn.addEventListener('click', function() {
+            const availableMunicipalities = municipalities
+                .filter(muni => window.selectedStates.has(muni.state_name))
+                .map(muni => muni.muni_name);
+
+            if (window.selectedMunicipalities.size === availableMunicipalities.length) {
+                // If all available municipalities are selected, clear them
+                window.selectedMunicipalities.clear();
+            } else {
+                // Select all municipalities for selected states
+                availableMunicipalities.forEach(muni => {
+                    window.selectedMunicipalities.add(muni);
+                });
+            }
+            
+            updateMunicipalitiesUI();
+            if (window.updateMapFilter) {
+                window.updateMapFilter();
+            }
+        });
+    }
+}
+
+// Modify fetchRegionsData to initialize filter controls after data is loaded
+async function fetchRegionsData() {
+    if (isLoading) return;
+    
+    try {
+        isLoading = true;
+        showLoading();
+        
+        const response = await fetch(`${config.API_BASE_URL}/regions?country=${window.currentCountry}`);
+        const data = await response.json();
+        
+        if (!response.ok || data.error) {
+            throw new Error(data.message || 'Failed to fetch regions data');
+        }
+        
+        states = data.states;
+        municipalities = data.municipalities;
+        
+        // Initialize state and municipality selections
+        window.selectedStates = new Set(states.map(state => state.statename));
+        window.selectedMunicipalities = new Set(municipalities.map(muni => muni.muni_name));
+        
+        // Update UI
+        updateStatesUI();
+        updateMunicipalitiesUI();
+        
+        // Initialize filter controls after data is loaded
+        initializeFilterControls();
+        
+        // Update map
+        if (window.updateMapFilter) {
+            window.updateMapFilter();
+        }
+        
+    } catch (error) {
+        console.error('Error fetching regions data:', error);
+        showError(error.message);
+    } finally {
+        isLoading = false;
+    }
+}
+
+// Initialize panel toggle functionality
+panelToggle?.addEventListener('click', function() {
+    const toggleInfo = this.querySelector('.toggle-info');
+    const toggleWidget = this.querySelector('.toggle-widget');
+    
+    if (infoDefaultContent.style.display !== 'none') {
+        toggleWidget.classList.add('active');
+        toggleInfo.classList.remove('active');
+        filterWidget.style.display = 'block';
+        infoDefaultContent.style.display = 'none';
+    } else {
+        toggleInfo.classList.add('active');
+        toggleWidget.classList.remove('active');
+        infoDefaultContent.style.display = 'block';
+        filterWidget.style.display = 'none';
+    }
 });

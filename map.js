@@ -463,19 +463,16 @@ async function updateMapFilter() {
                     const featureState = feature.get('StateName') || feature.get('state_name');
                     const featureMuni = feature.get('Muni_Name') || feature.get('muni_name');
                     
-                    console.log(`Feature data for ${layerName}:`, {
-                        country: featureCountry,
-                        state: featureState,
-                        municipality: featureMuni
-                    });
-                    
                     // Check if feature should be visible based on filters
                     const matchesCountry = featureCountry === currentCountry;
+                    
+                    // Show all states if none are selected, otherwise show only selected states
                     const matchesState = states.length === 0 || states.includes(featureState);
+                    
+                    // Show all municipalities if none are selected, otherwise show only selected municipalities
                     const matchesMuni = municipalities.length === 0 || municipalities.includes(featureMuni);
                     
                     const isVisible = matchesCountry && matchesState && matchesMuni;
-                    console.log(`Feature visibility for ${layerName}:`, { isVisible, matchesCountry, matchesState, matchesMuni });
                     
                     if (isVisible) {
                         return styles[layerName](feature);
@@ -489,9 +486,6 @@ async function updateMapFilter() {
             layer.changed();
         }
     }
-    
-    // Update map view
-    updateMapView();
     
     // Force map render
     if (window.map) {
