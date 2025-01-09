@@ -1,6 +1,9 @@
 bind = "0.0.0.0:5001"
 daemon = False
-pidfile = None
+pidfile = "gunicorn.pid"
 reload = False
 workers = 4
 timeout = 120
+max_requests = 0
+max_requests_jitter = 0
+graceful_timeout = 30

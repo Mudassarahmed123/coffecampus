@@ -23,6 +23,24 @@
             <img src="images/logo.svg" alt="Logo">
         </div>
 
+        <div id="search-container">
+            <div class="search-input-wrapper">
+                <input type="text" id="place-search" placeholder="Search location...">
+                <button id="search-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                </button>
+                <button id="current-location-button" title="Go to current location">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M12 2v3m0 14v3M2 12h3m14 0h3"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
         <div id="map" class="map"></div>
 
         <div id="map-type-toggle">
@@ -30,48 +48,125 @@
             <button>Satellite</button>
         </div>
 
+        <!-- Layers Toggle Button -->
+        <button class="layers-toggle" id="layers-toggle">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+        </button>
+
+        <!-- Layer Control -->
         <div id="layer-control" class="layer-control">
-            <button class="collapse-toggle" title="Toggle layers">←</button>
-            <h4>Layers</h4>
-            <div class="layer-items">
-                <div class="layer-item">
-                    <div class="layer-header">
-                        <div class="layer-title">
-                            <input type="checkbox" id="forest_presence_view" checked>
-                            <label for="forest_presence_view">Presence of Forest</label>
+            <div class="layer-control-header">
+                <h4>Layers</h4>
+                <button class="close-button">✕</button>
+            </div>
+            
+            <div class="layer-control-content">
+                <div class="layer-items">
+                    <!-- Forest Presence Layer -->
+                    <div class="layer-item forest-presence">
+                        <div class="layer-header">
+                            <div class="layer-title">
+                                <input type="checkbox" id="forest_presence_view" checked>
+                                <label for="forest_presence_view">Presence of Forest</label>
+                            </div>
+                        </div>
+                        <div class="zoom-level">Zoom level 0 - 21</div>
+                        <div class="color-based">COLOR BASED ON</div>
+                        <div class="color-based-value">Percentage of Forest area</div>
+                        <div class="legend-items">
+                            <div class="legend-item">
+                                <div class="legend-color zero"></div>
+                                <div class="legend-label">0%</div>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color low"></div>
+                                <div class="legend-label">0% - ≤10%</div>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color medium"></div>
+                                <div class="legend-label">10% - ≤50%</div>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color high"></div>
+                                <div class="legend-label">50% - ≤90%</div>
+                            </div>
                         </div>
                     </div>
-                    <div id="forest_presence_view-legend" class="layer-legend"></div>
-                </div>
 
-                <div class="layer-item">
-                    <div class="layer-header">
-                        <div class="layer-title">
-                            <input type="checkbox" id="deforestation_view">
-                            <label for="deforestation_view">Prevalence of Deforestation</label>
+                    <!-- Deforestation Layer -->
+                    <div class="layer-item deforestation">
+                        <div class="layer-header">
+                            <div class="layer-title">
+                                <input type="checkbox" id="deforestation_view">
+                                <label for="deforestation_view">Prevalence of Deforestation</label>
+                            </div>
+                        </div>
+                        <div class="zoom-level">Zoom level 0 - 21</div>
+                        <div class="color-based">COLOR BASED ON</div>
+                        <div class="color-based-value">Percentage of Deforestation area</div>
+                        <div class="legend-items">
+                            <div class="legend-item">
+                                <div class="legend-color zero"></div>
+                                <div class="legend-label">0%</div>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color low"></div>
+                                <div class="legend-label">0% - ≤1%</div>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color medium"></div>
+                                <div class="legend-label">1% - ≤5%</div>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color high"></div>
+                                <div class="legend-label">>5%</div>
+                            </div>
                         </div>
                     </div>
-                    <div id="deforestation_view-legend" class="layer-legend"></div>
-                </div>
 
-                <div class="layer-item">
-                    <div class="layer-header">
-                        <div class="layer-title">
-                            <input type="checkbox" id="social_GHR">
-                            <label for="social_GHR">Governance and Human Rights</label>
+                    <!-- Social GHR Layer -->
+                    <div class="layer-item social-ghr">
+                        <div class="layer-header">
+                            <div class="layer-title">
+                                <input type="checkbox" id="social_GHR">
+                                <label for="social_GHR">Governance and Human Rights</label>
+                            </div>
+                        </div>
+                        <div class="zoom-level">Zoom level 0 - 21</div>
+                        <div class="color-based">COLOR BASED ON</div>
+                        <div class="color-based-value">Governance and Human Rights</div>
+                        <div class="legend-items">
+                            <div class="legend-item">
+                                <div class="legend-color enabled"></div>
+                                <div class="legend-label">Governance and Human Rights</div>
+                            </div>
                         </div>
                     </div>
-                    <div id="social_GHR-legend" class="layer-legend"></div>
-                </div>
 
-                <div class="layer-item">
-                    <div class="layer-header">
-                        <div class="layer-title">
-                            <input type="checkbox" id="coffee_regions_view">
-                            <label for="coffee_regions_view">Coffee Region</label>
+                    <!-- Coffee Region Layer -->
+                    <div class="layer-item coffee-region">
+                        <div class="layer-header">
+                            <div class="layer-title">
+                                <input type="checkbox" id="coffee_regions_view">
+                                <label for="coffee_regions_view">Coffee Region</label>
+                            </div>
+                        </div>
+                        <div class="zoom-level">Zoom level 0 - 21</div>
+                        <div class="color-based">COLOR BASED ON</div>
+                        <div class="color-based-value">Coffee Region Status</div>
+                        <div class="legend-items">
+                            <div class="legend-item">
+                                <div class="legend-color yes"></div>
+                                <div class="legend-label">Coffee Region</div>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color no"></div>
+                                <div class="legend-label">Rest of the Country</div>
+                            </div>
                         </div>
                     </div>
-                    <div id="coffee_regions_view-legend" class="layer-legend"></div>
                 </div>
             </div>
         </div>
@@ -95,66 +190,58 @@
             <span>ℹ️</span>
         </button>
 
-        <div id="info-panel" class="info-panel">
-            <!-- Info Panel Content -->
-            <div id="info-default-content">
-                <div class="info-header">
-                    <h3>Information Panel</h3>
-                    <div class="header-controls">
-                        <div id="panel-toggle" class="panel-toggle">
-                            <span class="toggle-info active">Info</span>
-                            <span class="toggle-widget">Filter</span>
-                        </div>
-                        <button class="info-close">✖</button>
-                    </div>
+        <div id="info-panel" class="info-panel visible">
+            <div class="info-header">
+                <h3>EUDR Coffee Compass</h3>
+                <div class="header-controls">
+                    <button class="info-close">✖</button>
                 </div>
-                <!-- Info content goes here -->
             </div>
+            <div class="info-content">
+                <div id="info-default-content">
+                    <h4>El Salvador</h4>
+                    
+                    <p>Explore the interactive map featuring abstract risk assessment including:</p>
+                    
+                    <ul>
+                        <li>- Presence of Forest
+                            <span class="sublevel">(subnational level)</span>
+                        </li>
+                        <li>- Prevalence of Deforestation
+                            <span class="sublevel">(subnational level)</span>
+                        </li>
+                        <li>- Presence of Indigenous area
+                            <span class="sublevel">(subnational level)</span>
+                        </li>
+                        <li>- Governance & Human Rights
+                            <span class="sublevel">(national level)</span>
+                        </li>
+                    </ul>
 
-            <!-- Filter Panel Content -->
-            <div id="filter-content" style="display: none;">
-                <div class="info-header">
-                    <h3>Filter Panel</h3>
-                    <div class="header-controls">
-                        <div id="panel-toggle" class="panel-toggle">
-                            <span class="toggle-info">Info</span>
-                            <span class="toggle-widget active">Filter</span>
-                        </div>
-                        <button class="info-close">✖</button>
+                    <p class="date">Jan 2024</p>
+
+                    <div class="map-guide">
+                        <h4>Map Guide:</h4>
+                        <p>Explore the different map functionalities</p>
+                        <ul>
+                            <li>📍 Map description</li>
+                            <li>🗺️ Department/municipality selector panel</li>
+                            <li>📊 Show legend panel</li>
+                            <li>👁️ Show layer</li>
+                            <li>❌ Hide layer</li>
+                        </ul>
                     </div>
-                </div>
-                <div id="filter-widget">
-                    <div class="widget-sections">
-                        <!-- States Section -->
-                        <div class="widget-section">
-                            <div class="widget-header">
-                                <h4>States</h4>
-                                <div class="flex items-center gap-2">
-                                    <button id="clear-states" class="text-blue-500">Clear</button>
-                                    <button id="lock-states" class="text-blue-500 lock-button">Lock</button>
-                                </div>
-                            </div>
-                            <div class="mt-2">
-                                <input type="text" id="state-search" class="search-input" placeholder="Search states...">
-                            </div>
-                            <div class="selected-count">
-                                <span class="text-sm text-gray-500">Selected: <span id="selected-states-count">0</span></span>
-                            </div>
-                            <div id="states-list" class="checkbox-list"></div>
-                        </div>
 
-                        <!-- Municipalities Section -->
-                        <div class="widget-section">
-                            <div class="widget-header">
-                                <h4>Municipalities</h4>
-                                <button id="all-municipalities" class="text-blue-500">Select All</button>
-                            </div>
-                            <div class="mt-2">
-                                <input type="text" id="municipality-search" class="search-input" placeholder="Search municipalities...">
-                            </div>
-                            <div id="municipalities-list" class="checkbox-list"></div>
+                    <p class="tutorial">To access the detailed tutorial, click <a href="#" class="here-link">here</a></p>
+
+                    <div class="developed-by">
+                        <h4>Developed by</h4>
+                        <div class="logo-placeholder">
+                            <img src="images/2.jpg" alt="Developer Logo">
                         </div>
                     </div>
+
+                    <p class="disclaimer">Note: The information displayed in this map is a supportive information to contribute to the risk assessment as required by the EUDR. As a stand-alone information, it does not completely fulfill the due diligence requirements for EUDR compliance. It is non-legally binding, non-exclusive and non-mandatory.</p>
                 </div>
             </div>
         </div>
@@ -193,10 +280,9 @@
                 if (coffeeRegionCheckbox) coffeeRegionCheckbox.checked = false;
             }
             
-            // Center map on Kenya by default
-            if (window.map) {
-                window.map.getView().setCenter(ol.proj.fromLonLat([37.9062, 0.0236]));
-                window.map.getView().setZoom(6);
+            // Initialize map view based on current country
+            if (window.map && window.updateMapView) {
+                window.updateMapView();
             }
             
             // Initialize state handlers

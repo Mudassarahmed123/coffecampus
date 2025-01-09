@@ -6,6 +6,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const infoToggle = document.getElementById('info-toggle');
     const contentWrapper = document.querySelector('.content-wrapper');
 
+    // Set initial state - panel is visible by default
+    infoPanel.classList.add('visible');
+    contentWrapper.classList.remove('panel-hidden');
+    infoToggle.classList.add('active');
+
     // Inline HTML content
     infoPanel.innerHTML = `
         <div class="info-header">
@@ -74,7 +79,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <h4>States</h4>
                             <div class="flex items-center gap-2">
                                 <button id="clear-states" class="text-blue-500">Clear</button>
-                                <button id="lock-states" class="text-blue-500 lock-button">Lock</button>
+                                <button id="lock-states" class="text-blue-500">Select All</button>
                             </div>
                         </div>
                         <div class="mt-2">
@@ -370,29 +375,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Panel visibility toggles
     infoToggle?.addEventListener('click', () => {
-        infoPanel.classList.toggle('visible');
-        infoToggle.classList.toggle('active');
-        contentWrapper.classList.toggle('panel-visible');
-        
-        // Make sure info content is visible when opening panel
-        if (infoPanel.classList.contains('visible')) {
-            if (infoDefaultContent && filterWidget) {
-                infoDefaultContent.style.display = 'block';
-                filterWidget.style.display = 'none';
-            }
-            if (toggleInfo && toggleWidget) {
-                toggleInfo.classList.add('active');
-                toggleWidget.classList.remove('active');
-            }
+        const isPanelVisible = infoPanel.classList.contains('visible');
+        if (isPanelVisible) {
+            // Close panel
+            infoPanel.classList.remove('visible');
+            contentWrapper.classList.add('panel-hidden');
+            infoToggle.classList.remove('active');
+        } else {
+            // Open panel
+            infoPanel.classList.add('visible');
+            contentWrapper.classList.remove('panel-hidden');
+            infoToggle.classList.add('active');
         }
-        
         setTimeout(() => window.dispatchEvent(new Event('resize')), 300);
     });
 
     infoClose?.addEventListener('click', () => {
         infoPanel.classList.remove('visible');
+        contentWrapper.classList.add('panel-hidden');
         infoToggle.classList.remove('active');
-        contentWrapper.classList.remove('panel-visible');
         setTimeout(() => window.dispatchEvent(new Event('resize')), 300);
     });
 
@@ -420,6 +421,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize event listeners for filter controls
     document.getElementById('clear-states')?.addEventListener('click', () => {
+        console.log('Clear button clicked - clearing all selections');
         window.selectedStates.clear();
         window.selectedMunicipalities.clear();
         updateStatesUI();
@@ -439,9 +441,11 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // If all states are already selected, clear the selection
             if (window.selectedStates.size === allStates.length) {
+                console.log('Select All button clicked - all states were selected, clearing selections');
                 window.selectedStates.clear();
                 window.selectedMunicipalities.clear();
             } else {
+                console.log('Select All button clicked - selecting all states and municipalities');
                 // Otherwise, select all states
                 allStates.forEach(state => window.selectedStates.add(state));
                 // Also select all municipalities for these states
@@ -468,8 +472,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // If all available municipalities are selected, clear them
         if (window.selectedMunicipalities.size === availableMunicipalities.length) {
+            console.log('Select All Municipalities button clicked - all municipalities were selected, clearing selections');
             window.selectedMunicipalities.clear();
         } else {
+            console.log('Select All Municipalities button clicked - selecting all available municipalities');
             // Otherwise select all available municipalities
             availableMunicipalities.forEach(muni => window.selectedMunicipalities.add(muni));
         }
@@ -485,11 +491,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const municipalitySearch = document.getElementById('municipality-search');
 
     if (stateSearch) {
-        stateSearch.addEventListener('input', debounce((e) => updateStatesUI(e.target.value), 300));
+        stateSearch.addEventListener('input', debounce(function() {
+            updateStatesUI(this.value);
+        }, 300));
     }
-    
+
     if (municipalitySearch) {
-        municipalitySearch.addEventListener('input', debounce((e) => updateMunicipalitiesUI(e.target.value), 300));
+        municipalitySearch.addEventListener('input', debounce(function() {
+            updateMunicipalitiesUI(this.value);
+        }, 300));
     }
 
     // Update map size when window resizes
@@ -657,7 +667,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <h4>States</h4>
                     <div class="flex items-center gap-2">
                         <button id="clear-states" class="text-blue-500">Clear</button>
-                        <button id="lock-states" class="text-blue-500 lock-button">Lock</button>
+                        <button id="lock-states" class="text-blue-500">Select All</button>
                     </div>
                 </div>
                 <div class="mt-2">
@@ -712,135 +722,66 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Make window.map available for other scripts
     window.map = map;
-});
 
-// Initialize event listeners for filter controls
-function initializeFilterControls() {
-    // Clear states button
-    const clearStatesBtn = document.getElementById('clear-states');
-    if (clearStatesBtn) {
-        clearStatesBtn.addEventListener('click', function() {
-            window.selectedStates.clear();
-            window.selectedMunicipalities.clear();
-            updateStatesUI();
-            updateMunicipalitiesUI();
-            if (window.updateMapFilter) {
-                window.updateMapFilter();
-            }
-        });
-    }
+    // Layer control functionality
+    if (document.getElementById('layer-control')) {
+        const layerControl = document.getElementById('layer-control');
+        const layersToggle = document.getElementById('layers-toggle');
+        const layerCloseButton = layerControl.querySelector('.close-button');
+        const layerContent = layerControl.querySelector('.layer-control-content');
 
-    // Select all states button (formerly lock button)
-    const selectAllStatesBtn = document.getElementById('lock-states');
-    if (selectAllStatesBtn) {
-        selectAllStatesBtn.textContent = 'Select All';
-        selectAllStatesBtn.addEventListener('click', function() {
-            const allStates = states.map(state => state.statename);
-            
-            if (window.selectedStates.size === allStates.length) {
-                // If all states are selected, clear everything
-                window.selectedStates.clear();
-                window.selectedMunicipalities.clear();
+        // Function to update layer control height
+        function updateLayerControlHeight() {
+            const checkedLayers = layerControl.querySelectorAll('input[type="checkbox"]:checked');
+            if (checkedLayers.length === 0) {
+                layerContent.style.maxHeight = 'fit-content';
+                layerControl.style.height = 'auto';
             } else {
-                // Select all states and their municipalities
-                allStates.forEach(state => window.selectedStates.add(state));
-                municipalities.forEach(muni => {
-                    if (window.selectedStates.has(muni.state_name)) {
-                        window.selectedMunicipalities.add(muni.muni_name);
-                    }
-                });
+                layerContent.style.maxHeight = '80vh';
+                layerControl.style.height = 'auto';
             }
-            
-            updateStatesUI();
-            updateMunicipalitiesUI();
-            if (window.updateMapFilter) {
-                window.updateMapFilter();
+        }
+
+        // Show layers panel by default
+        layerControl.classList.remove('collapsed');
+        layersToggle.classList.add('hidden');
+
+        // Show legends for checked layers by default
+        const checkedLayers = layerControl.querySelectorAll('input[type="checkbox"]:checked');
+        checkedLayers.forEach(checkbox => {
+            const layerItem = checkbox.closest('.layer-item');
+            const legend = layerItem.querySelector('.legend-items');
+            if (legend) {
+                legend.style.display = 'block';
             }
         });
-    }
 
-    // Select all municipalities button
-    const selectAllMunisBtn = document.getElementById('all-municipalities');
-    if (selectAllMunisBtn) {
-        selectAllMunisBtn.addEventListener('click', function() {
-            const availableMunicipalities = municipalities
-                .filter(muni => window.selectedStates.has(muni.state_name))
-                .map(muni => muni.muni_name);
+        // Initial height update
+        updateLayerControlHeight();
 
-            if (window.selectedMunicipalities.size === availableMunicipalities.length) {
-                // If all available municipalities are selected, clear them
-                window.selectedMunicipalities.clear();
-            } else {
-                // Select all municipalities for selected states
-                availableMunicipalities.forEach(muni => {
-                    window.selectedMunicipalities.add(muni);
-                });
-            }
-            
-            updateMunicipalitiesUI();
-            if (window.updateMapFilter) {
-                window.updateMapFilter();
-            }
+        // Handle checkbox changes to show/hide legends and update height
+        const checkboxes = layerControl.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const layerItem = this.closest('.layer-item');
+                const legend = layerItem.querySelector('.legend-items');
+                if (legend) {
+                    legend.style.display = this.checked ? 'block' : 'none';
+                }
+                updateLayerControlHeight();
+            });
         });
-    }
-}
 
-// Modify fetchRegionsData to initialize filter controls after data is loaded
-async function fetchRegionsData() {
-    if (isLoading) return;
-    
-    try {
-        isLoading = true;
-        showLoading();
-        
-        const response = await fetch(`${config.API_BASE_URL}/regions?country=${window.currentCountry}`);
-        const data = await response.json();
-        
-        if (!response.ok || data.error) {
-            throw new Error(data.message || 'Failed to fetch regions data');
-        }
-        
-        states = data.states;
-        municipalities = data.municipalities;
-        
-        // Initialize state and municipality selections
-        window.selectedStates = new Set(states.map(state => state.statename));
-        window.selectedMunicipalities = new Set(municipalities.map(muni => muni.muni_name));
-        
-        // Update UI
-        updateStatesUI();
-        updateMunicipalitiesUI();
-        
-        // Initialize filter controls after data is loaded
-        initializeFilterControls();
-        
-        // Update map
-        if (window.updateMapFilter) {
-            window.updateMapFilter();
-        }
-        
-    } catch (error) {
-        console.error('Error fetching regions data:', error);
-        showError(error.message);
-    } finally {
-        isLoading = false;
-    }
-}
+        // Handle close button click
+        layerCloseButton?.addEventListener('click', () => {
+            layerControl.classList.add('collapsed');
+            layersToggle.classList.remove('hidden');
+        });
 
-// Initialize panel toggle functionality
-panelToggle?.addEventListener('click', function() {
-    const toggleInfo = this.querySelector('.toggle-info');
-    const toggleWidget = this.querySelector('.toggle-widget');
-    
-    if (infoDefaultContent.style.display !== 'none') {
-        toggleWidget.classList.add('active');
-        toggleInfo.classList.remove('active');
-        filterWidget.style.display = 'block';
-        infoDefaultContent.style.display = 'none';
-    } else {
-        toggleInfo.classList.add('active');
-        toggleWidget.classList.remove('active');
-        infoDefaultContent.style.display = 'block';
-        filterWidget.style.display = 'none';
+        // Handle layers toggle button click
+        layersToggle?.addEventListener('click', () => {
+            layerControl.classList.remove('collapsed');
+            layersToggle.classList.add('hidden');
+        });
     }
 });

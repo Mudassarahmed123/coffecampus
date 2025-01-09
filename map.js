@@ -6,7 +6,7 @@ const styles = {
         let color;
         
         if (forRPerc === '0%') {
-            color = 'rgba(144, 238, 144, 0.6)';
+            color = 'rgba(128, 128, 128)';
         } else if (forRPerc === '0% - <=10%') {
             color = 'rgba(60, 179, 113, 0.6)';
         } else if (forRPerc === '10% - <=50%') {
@@ -26,11 +26,13 @@ const styles = {
         let color;
         
         if (defRPerc === '0%') {
-            color = 'rgba(255, 182, 193, 0.6)';
+            color = 'rgb(128, 128, 128)';  // Gray
         } else if (defRPerc === '0% - <=1%') {
-            color = 'rgba(255, 99, 71, 0.6)';
+            color = 'rgb(255, 255, 153)';  // Light yellow
         } else if (defRPerc === '1% - <=5%') {
-            color = 'rgba(220, 20, 60, 0.6)';
+            color = 'rgb(255, 178, 102)';  // Orange
+        } else if (defRPerc === '>5%') {
+            color = 'rgb(204, 102, 0)';  // Dark orange/brown
         }
         
         return new ol.style.Style({
@@ -65,16 +67,17 @@ function getLegendItems(layerName) {
     switch(layerName) {
         case 'forest_presence_view':
             return [
-                { color: 'rgba(144, 238, 144, 0.6)', label: '0%' },
+                { color: 'rgba(128, 128, 128)', label: '0%' },
                 { color: 'rgba(60, 179, 113, 0.6)', label: '0% - <=10%' },
                 { color: 'rgba(34, 139, 34, 0.6)', label: '10% - <=50%' },
                 { color: 'rgba(0, 100, 0, 0.6)', label: '50% - <=90%' }
             ];
         case 'deforestation_view':
             return [
-                { color: 'rgba(255, 182, 193, 0.6)', label: '0%' },
-                { color: 'rgba(255, 99, 71, 0.6)', label: '0% - <=1%' },
-                { color: 'rgba(220, 20, 60, 0.6)', label: '1% - <=5%' }
+                { color: 'rgb(128, 128, 128)', label: '0' },
+                { color: 'rgb(255, 255, 153)', label: '<1%' },
+                { color: 'rgb(255, 178, 102)', label: '1% - 5%' },
+                { color: 'rgb(204, 102, 0)', label: '>5%' }
             ];
         case 'social_GHR':
             return [
@@ -123,13 +126,12 @@ function createVectorTileLayer(layerName) {
         format: new ol.format.MVT(),
         url: `${config.GEOSERVER_BASE_URL}/geoserver/gwc/service/tms/1.0.0/it.geosolutions:${layerName}@EPSG%3A900913@pbf/{z}/{x}/{-y}.pbf?viewparams=country:${currentCountry}`,
         tileGrid: ol.tilegrid.createXYZ({
-            maxZoom: 19,
-            tileSize: 512, // Increased tile size for better performance
-            extent: ol.proj.get('EPSG:3857').getExtent()
+            maxZoom: 24,
+            tileSize: 512
         }),
-        cacheSize: 256, // Increased cache size
-        preload: 2, // Preload nearby tiles
-        overlaps: false // Disable overlaps for better performance
+        cacheSize: 256,
+        preload: 2,
+        overlaps: false
     });
     
     const layer = new ol.layer.VectorTile({
@@ -146,9 +148,7 @@ function createVectorTileLayer(layerName) {
         renderBuffer: 128,
         updateWhileAnimating: false,
         updateWhileInteracting: false,
-        preload: 2,
-        minZoom: 5, // Add zoom constraints
-        maxZoom: 19
+        preload: 2
     });
 
     return layer;
@@ -209,35 +209,26 @@ const coffeeRegionLayer = createVectorTileLayer('coffee_regions_view');
 
 // Base layers with optimized settings
 const osmLayer = new ol.layer.Tile({
-    source: new ol.source.OSM({
-        crossOrigin: 'anonymous',
-        wrapX: true,
-        tileLoadFunction: function(imageTile, src) {
-            imageTile.getImage().src = src;
-        },
-        cacheSize: 512,
-        preload: 2
-    }),
-    visible: true,
-    preload: 2,
-    minZoom: 1,
-    maxZoom: 21
+    source: new ol.source.OSM(),
+    visible: false
 });
 
 const satelliteLayer = new ol.layer.Tile({
     source: new ol.source.XYZ({
         url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        maxZoom: 21,
-        crossOrigin: 'anonymous',
-        wrapX: true,
-        cacheSize: 512,
-        preload: 2
+        maxZoom: 21
     }),
-    visible: false,
-    preload: 2,
-    minZoom: 1,
-    maxZoom: 21
+    visible: true
 });
+
+// Get initial coordinates based on current country
+const coordinates = {
+    [config.COUNTRIES.KENYA]: [37.9062, 0.0236],
+    [config.COUNTRIES.VIETNAM]: [108.2772, 14.0583]
+};
+
+const currentCountry = config.getCurrentCountry();
+const initialCenter = coordinates[currentCountry] || [37.9062, 0.0236];
 
 // Create map with optimized settings
 const map = new ol.Map({
@@ -251,17 +242,13 @@ const map = new ol.Map({
         coffeeRegionLayer
     ],
     view: new ol.View({
-        center: ol.proj.fromLonLat([37.9062, 0.0236]),
+        center: ol.proj.fromLonLat(initialCenter),
         zoom: 6,
-        projection: 'EPSG:3857',
-        maxZoom: 21,
-        minZoom: 1,
-        enableRotation: false,
-        zoomDuration: 500, // Slower zoom animation
-        constrainResolution: true
+        projection: 'EPSG:3857'
     }),
-    loadTilesWhileAnimating: true,
-    loadTilesWhileInteracting: true
+    controls: ol.control.defaults.defaults().extend([
+        new ol.control.Zoom()
+    ])
 });
 
 // Initialize popups
@@ -515,6 +502,10 @@ function updateMapView() {
     });
 }
 
+// Make updateMapView available globally
+window.updateMapView = updateMapView;
+
+// Initialize map with correct country coordinates
 function initializeMap() {
     const coordinates = {
         [config.COUNTRIES.KENYA]: [37.9062, 0.0236],
@@ -564,19 +555,298 @@ function trackTileLoad(layer) {
 // Track loading for all layers
 [osmLayer, satelliteLayer, forestPresenceLayer, deforestationLayer, socialGHRLayer, coffeeRegionLayer].forEach(trackTileLoad);
 
+// Function to add a marker at a location - moved to global scope
+function addMarkerToMap(longitude, latitude, isCurrentLocation = false) {
+    // Create marker feature
+    const markerFeature = new ol.Feature({
+        geometry: new ol.geom.Point(ol.proj.fromLonLat([longitude, latitude]))
+    });
+    
+    let markerStyle;
+    if (isCurrentLocation) {
+        markerStyle = new ol.style.Style({
+            image: new ol.style.Circle({
+                radius: 30,  // Smaller radius
+                fill: new ol.style.Fill({ color: 'red' }),
+                stroke: new ol.style.Stroke({
+                    color: ['red', 'rgba(255,0,0,0.2)'],
+                    lineDash: [4],
+                    lineDashOffset: 0,
+                    width: 2
+                })
+            })
+        });
+    } else {
+        // Use a default marker style with smaller size
+        markerStyle = new ol.style.Style({
+            image: new ol.style.RegularShape({
+                points: 20,
+                radius: 15,  // Smaller radius
+                radius2: 0,
+                angle: 0,
+                fill: new ol.style.Fill({ color: '#E91E63' }),
+                stroke: new ol.style.Stroke({
+                    color: '#fff',
+                    width: 2
+                })
+            })
+        });
+    }
+    
+    const markerSource = new ol.source.Vector({
+        features: [markerFeature]
+    });
+    
+    // Remove old marker layer if it exists
+    const layerName = isCurrentLocation ? 'currentLocation' : 'searchMarker';
+    const oldLayer = map.getLayers().getArray().find(layer => layer.get('name') === layerName);
+    if (oldLayer) {
+        map.removeLayer(oldLayer);
+    }
+    
+    const markerLayer = new ol.layer.Vector({
+        source: markerSource,
+        style: markerStyle,
+        name: layerName,
+        zIndex: 1000
+    });
+    
+    map.addLayer(markerLayer);
+}
+
+// Initialize current location functionality
+function initializeCurrentLocation() {
+    const currentLocationButton = document.getElementById('current-location-button');
+    
+    function handleLocationSuccess(position) {
+        const { latitude, longitude } = position.coords;
+        console.log('Got current location:', latitude, longitude);
+        
+        // Animate to the location
+        map.getView().animate({
+            center: ol.proj.fromLonLat([longitude, latitude]),
+            zoom: 14,
+            duration: 1000
+        });
+        
+        currentLocationButton.classList.remove('loading');
+        
+        // Add marker for current location
+        addMarkerToMap(longitude, latitude, true);
+    }
+
+    function handleLocationError(error) {
+        console.error('Geolocation error:', error);
+        currentLocationButton.classList.remove('loading');
+        
+        let errorMessage = 'Could not get your location';
+        switch(error.code) {
+            case error.PERMISSION_DENIED:
+                errorMessage = `
+                    Location access was denied. Please enable location access in your browser settings:
+                    <br><br>
+                    <strong>Chrome/Edge:</strong> Click the lock/info icon in the address bar → Site settings → Location → Allow
+                    <br>
+                    <strong>Firefox:</strong> Click the lock icon in the address bar → Clear setting → Allow location access
+                    <br>
+                    <strong>Safari:</strong> Safari menu → Preferences → Websites → Location → Allow
+                `;
+                break;
+            case error.POSITION_UNAVAILABLE:
+                errorMessage = 'Location information is unavailable';
+                break;
+            case error.TIMEOUT:
+                errorMessage = 'Location request timed out';
+                break;
+        }
+        
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'location-error-popup';
+        errorDiv.innerHTML = `
+            <div class="error-content">
+                <h4>Location Access Required</h4>
+                <p>${errorMessage}</p>
+                <button onclick="this.parentElement.parentElement.remove()">Close</button>
+            </div>
+        `;
+        document.body.appendChild(errorDiv);
+    }
+
+    if (currentLocationButton) {
+        currentLocationButton.addEventListener('click', () => {
+            if (!navigator.geolocation) {
+                handleLocationError({ code: 0, message: 'Geolocation is not supported by your browser' });
+                return;
+            }
+            
+            currentLocationButton.classList.add('loading');
+            
+            // Force a new location request each time
+            navigator.geolocation.getCurrentPosition(
+                handleLocationSuccess,
+                handleLocationError,
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0,
+                    prompt: true  // Force the permission prompt
+                }
+            );
+        });
+    }
+}
+
+// Initialize search functionality
+function initializeSearch() {
+    const searchInput = document.getElementById('place-search');
+    const searchButton = document.getElementById('search-button');
+    
+    // Create suggestions container
+    const suggestionsContainer = document.createElement('div');
+    suggestionsContainer.id = 'search-suggestions';
+    suggestionsContainer.className = 'search-suggestions';
+    document.getElementById('search-container').appendChild(suggestionsContainer);
+
+    let debounceTimer;
+    
+    async function searchPlaces(searchText) {
+        if (!searchText.trim()) {
+            suggestionsContainer.style.display = 'none';
+            return;
+        }
+        
+        try {
+            console.log('Searching globally for:', searchText);
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/search?` +
+                `format=json&` +
+                `q=${encodeURIComponent(searchText)}&` +
+                `limit=5&` +
+                `addressdetails=1&` +
+                `accept-language=en`,
+                {
+                    headers: {
+                        'Accept-Language': 'en',
+                        'User-Agent': 'EUDR Coffee Compass'
+                    }
+                }
+            );
+            
+            if (!response.ok) throw new Error('Search failed');
+            
+            const results = await response.json();
+            console.log('Search results:', results);
+            
+            if (results.length > 0) {
+                suggestionsContainer.innerHTML = results.map(place => {
+                    // Extract the main name and address parts
+                    const mainName = place.name || place.display_name.split(',')[0];
+                    const addressParts = place.display_name
+                        .split(',')
+                        .map(part => part.trim())
+                        .filter(part => part !== mainName)
+                        .join(', ');
+
+                    return `
+                        <div class="search-suggestion" data-lon="${place.lon}" data-lat="${place.lat}">
+                            <strong>${mainName}</strong>
+                            <small>${addressParts}</small>
+                        </div>
+                    `;
+                }).join('');
+                
+                suggestionsContainer.style.display = 'block';
+                
+                // Add click handlers to suggestions
+                document.querySelectorAll('.search-suggestion').forEach(suggestion => {
+                    suggestion.addEventListener('click', () => {
+                        const lon = parseFloat(suggestion.dataset.lon);
+                        const lat = parseFloat(suggestion.dataset.lat);
+                        
+                        // Update input with selected place name
+                        searchInput.value = suggestion.querySelector('strong').textContent;
+                        
+                        // Hide suggestions
+                        suggestionsContainer.style.display = 'none';
+                        
+                        // Add marker to the map
+                        addMarkerToMap(lon, lat);
+                        
+                        // Animate to location
+                        map.getView().animate({
+                            center: ol.proj.fromLonLat([lon, lat]),
+                            zoom: 14,
+                            duration: 1000
+                        });
+                    });
+                });
+                
+                // Remove automatic selection of first result
+            } else {
+                suggestionsContainer.innerHTML = '<div class="no-results">No places found</div>';
+                suggestionsContainer.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Search error:', error);
+            suggestionsContainer.innerHTML = '<div class="search-error">Search failed. Please try again.</div>';
+            suggestionsContainer.style.display = 'block';
+        }
+    }
+
+    // Add input event listener with debounce
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            searchPlaces(e.target.value);
+        }, 300);
+    });
+
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#search-container')) {
+            suggestionsContainer.style.display = 'none';
+        }
+    });
+
+    // Handle search button click
+    searchButton.addEventListener('click', () => {
+        const searchText = searchInput.value.trim();
+        if (searchText) {
+            searchPlaces(searchText);
+        }
+    });
+
+    // Handle Enter key
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            const searchText = searchInput.value.trim();
+            if (searchText) {
+                searchPlaces(searchText);
+            }
+        }
+    });
+}
+
 // Initialize everything when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize layer panel collapse functionality
     const layerControl = document.getElementById('layer-control');
-    const toggleButton = document.querySelector('.collapse-toggle');
+    const layersToggle = document.getElementById('layers-toggle');
+    const closeButton = layerControl.querySelector('.close-button');
     
-    if (toggleButton && layerControl) {
-        toggleButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            layerControl.classList.toggle('collapsed');
-            // Update button text based on state
-            this.textContent = layerControl.classList.contains('collapsed') ? '→' : '←';
+    // Handle close button click
+    if (closeButton && layerControl && layersToggle) {
+        closeButton.addEventListener('click', () => {
+            layerControl.classList.add('collapsed');
+            layersToggle.classList.add('visible');
+        });
+    }
+
+    // Handle layers toggle button click
+    if (layersToggle && layerControl) {
+        layersToggle.addEventListener('click', () => {
+            layerControl.classList.remove('collapsed');
+            layersToggle.classList.remove('visible');
         });
     }
 
@@ -588,7 +858,12 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeMapTypeToggle();
     initializePopup();
     initializeHoverInfo();
+    
+    // Initialize map with correct country center
     initializeMap();
+    
+    initializeSearch();
+    initializeCurrentLocation();
     
     // Make window.map available for other scripts
     window.map = map;

@@ -24,7 +24,11 @@ const config = {
             // Update window.currentCountry for compatibility
             if (typeof window !== 'undefined') {
                 window.currentCountry = country;
-                // Trigger map update if it exists
+                // Update map view first
+                if (window.updateMapView) {
+                    window.updateMapView();
+                }
+                // Then update filters and data
                 if (window.updateMapFilter) {
                     window.updateMapFilter();
                 }
